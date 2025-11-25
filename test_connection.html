@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MATS Connection Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #020617;
+            color: #fff;
+        }
+        .test {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+        }
+        .success { border-color: #22c55e; background: #22c55e20; }
+        .error { border-color: #ef4444; background: #ef444420; }
+        .info { border-color: #3b82f6; background: #3b82f620; }
+        button {
+            padding: 10px 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+        pre { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>MATS Frontend-Backend Connection Test</h1>
+    <div id="results"></div>
+    <button onclick="runTests()">Run Connection Tests</button>
+    <button onclick="clearResults()">Clear</button>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const resultsDiv = document.getElementById('results');
+
+        function addResult(test, status, message, data = null) {
+            const div = document.createElement('div');
+            div.className = `test ${status}`;
+            div.innerHTML = `
+                <strong>${test}</strong>: ${message}
+                ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+            `;
+            resultsDiv.appendChild(div);
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('Health Check', 'success', 'Backend is reachable', data);
+                    return true;
+                } else {
+                    addResult('Health Check', 'error', `Failed: ${response.status} ${response.statusText}`);
+                    return false;
+                }
+            } catch (error) {
+                addResult('Health Check', 'error', `Connection failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testCORS() {
+            try {
+                const response = await fetch(`${API_BASE}/health`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET',
+                    }
+                });
+                const corsHeader = response.headers.get('Access-Control-Allow-Origin');
+                if (corsHeader) {
+                    addResult('CORS Check', 'success', `CORS configured: ${corsHeader}`);
+                    return true;
+                } else {
+                    addResult('CORS Check', 'info', 'CORS preflight response received (may be normal)');
+                    return true;
+                }
+            } catch (error) {
+                addResult('CORS Check', 'error', `CORS test failed: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testRoot() {
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('Root Endpoint', 'success', 'API root accessible', data);
+                    return true;
+                } else {
+                    addResult('Root Endpoint', 'error', `Failed: ${response.status}`);
+                    return false;
+                }
+            } catch (error) {
+                addResult('Root Endpoint', 'error', `Error: ${error.message}`);
+                return false;
+            }
+        }
+
+        async function testUpload() {
+            try {
+                // Create a dummy file for testing
+                const blob = new Blob(['test'], { type: 'application/octet-stream' });
+                const file = new File([blob], 'test.apk', { type: 'application/vnd.android.package-archive' });
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult('Upload Endpoint', 'success', 'Upload endpoint working', data);
+                    return data.apk_id;
+                } else {
+                    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                    addResult('Upload Endpoint', 'error', `Failed: ${error.detail || response.statusText}`);
+                    return null;
+                }
+            } catch (error) {
+                addResult('Upload Endpoint', 'error', `Error: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function runTests() {
+            resultsDiv.innerHTML = '';
+            addResult('Connection Test', 'info', `Testing connection to ${API_BASE}...`);
+
+            const healthOk = await testHealth();
+            await testCORS();
+            await testRoot();
+            
+            if (healthOk) {
+                const apkId = await testUpload();
+                if (apkId) {
+                    addResult('Full Workflow', 'success', `Upload successful! APK ID: ${apkId}`);
+                }
+            } else {
+                addResult('Full Workflow', 'error', 'Skipping upload test - backend not reachable');
+            }
+
+            addResult('Test Complete', 'info', 'All tests finished. Check results above.');
+        }
+
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+
+        // Auto-run on load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 500);
+        });
+    </script>
+</body>
+</html>
+

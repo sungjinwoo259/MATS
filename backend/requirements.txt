@@ -1,0 +1,24 @@
+# FastAPI and server
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+pydantic==2.9.2
+
+# Analysis Tools
+mitmproxy==11.0.0
+androguard==3.4.0
+frida==16.4.0
+frida-tools==12.3.0
+quark-engine==24.6.0
+objection==1.11.0
+
+# Utilities
+aiofiles==24.1.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+requests==2.32.3
+
+# File handling
+pyyaml==6.0.2
+lxml==5.3.0
+
